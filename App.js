@@ -6,7 +6,7 @@ import  AsyncStorage from '@react-native-community/async-storage';
 import { StyleSheet, View, ImageBackground, LogBox, Text, SafeAreaView, StatusBar, useColorScheme, Image, ScrollView, Dimensions, useWindowDimensions, Alert as Alert2, PermissionsAndroid} from 'react-native';
 import { createDrawerNavigator, DrawerItemList } from '@react-navigation/drawer';
 import { ActivityIndicator, HelperText, Appbar, Badge, TextInput, Button, IconButton, Divider, Searchbar, TouchableRipple, List, BottomNavigation, Banner, Avatar as Avatar1, FAB} from 'react-native-paper';
-import { NativeBaseProvider, Radio, Skeleton, useToast, Stack as Stack2, Icon, MaterialIcons, Avatar, Center, Pressable, Link, VStack, Box, Heading, FormControl, Input, Button as Button2, Modal, HStack, Text as Text2, WarningOutlineIcon, Alert, CloseIcon, IconButton as IconButton2} from 'native-base';
+import { NativeBaseProvider, Radio, Skeleton, useToast, Stack as Stack2, Icon, MaterialIcons, Avatar, Center, CheckIcon, Pressable, Link, VStack, Box, Heading, FormControl, Input, Button as Button2, Modal, HStack, Text as Text2, WarningOutlineIcon, Alert, CloseIcon, Checkbox, Select, IconButton as IconButton2} from 'native-base';
 import {theme, darkTheme} from './theme';
 import {TabView, SceneMap, TabBar } from "react-native-tab-view";
 import MapView, {Marker} from 'react-native-maps';
@@ -172,7 +172,8 @@ const authContext = React.useMemo(
             <Stack.Screen name="Welcome" component={WelcomePage} options={{headerShown: false}} />
           </Stack.Navigator>
         ) : (
-          <Stack.Navigator>
+          <Stack.Navigator initialRouteName='Info'>
+            <Stack.Screen name='Info' component={InfoPage} options={{headerShown: false}} />
           <Stack.Screen name="Home" component={HomePage} options={{headerShown: false}} />
         </Stack.Navigator>
         )}
@@ -196,6 +197,37 @@ const themeFromContext = React.useContext(ThemeContext);
 }
 
 
+const InfoPage = ({ navigation }) => {
+  const themeFromContext = React.useContext(ThemeContext);
+  const height = (Dimensions.get('window').height);
+    return (
+      <SafeAreaView style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: themeFromContext.colors.background}} >
+        <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: themeFromContext.colors.background}} >
+      <StatusBar barStyle={themeFromContext.status}  backgroundColor={themeFromContext.colors.background} />
+      <Image source={require('./assets/logo.png')} style={{width: 200, height: 200, borderRadius: 150, marginTop: height * 0.2,}} />
+      <NativeBaseProvider  >
+      <Center w="100%">
+      <Box safeArea p="2" py="8" w="90%" maxW="290" justifyContent="center" safeAreaBottom="5">
+        <Heading size="sm" fontWeight="600" color={themeFromContext.colors.foreground} _dark={{
+        color: "white"
+      }}>
+       FuelTrack is a free crowdsourcing platform for drivers. It monitors gas stations with fuel, as well as the 
+       demand for that fuel.
+        </Heading>
+        <VStack space={3} mt="5">
+
+
+          <Button2 onPress={() => {navigation.navigate("Home")}}  mt="5" bg="orange.700" style={{ height: 45}} size="md" colorScheme="indigo">
+            Get Started
+          </Button2>
+        </VStack>
+      </Box>
+    </Center>
+    </NativeBaseProvider>
+    </View>
+    </SafeAreaView>
+    )
+  }
 
 const HomePage = ({ navigation }) => {
   const themeFromContext = React.useContext(ThemeContext);
@@ -240,6 +272,9 @@ const HomePage = ({ navigation }) => {
   const [distance, setDistance] = React.useState(null);
   const [duration, setDuration] = React.useState(null);
   const [stroke, setStroke] = React.useState("cyan");
+  const [fuel, setFuel] = React.useState("");
+  const [station, setStation] = React.useState("");
+  const [alert, setAlert] = React.useState(false);
 
   const geolocate = async() => {
     Geolocation.getCurrentPosition(async position => {
@@ -263,30 +298,40 @@ const HomePage = ({ navigation }) => {
     }, error => console.log(error),);
   };
 
-  const engine = React.useCallback(() => {
+  async function fetchData(){
     var uri = "https://fluxservice.herokuapp.com/fuel/all";
-    async function fetchData(){
-      try{
-        await axios.post(uri).then(function(response){
-         if(response.status === 200){
-           let data = response.data.data;
-           setMarkers(data);
-         }
-       }).catch(function(error){
-         console.log(error);
-       })
-     } catch(e){
-       console.log(e);
-     }
-    }
+    try{
+      await axios.post(uri).then(function(response){
+       if(response.status === 200){
+         let data = response.data.data;
+         setMarkers(data);
+       }
+     }).catch(function(error){
+       console.log(error);
+     })
+   } catch(e){
+     console.log(e);
+   }
+  }
 
+  const engine = React.useCallback(() => {
     fetchData();
 }, []);
 
   React.useEffect(() => {
-    setMounted(true);
     geolocate();
-    var timer = setInterval(function(){engine()}, 1000);
+    fetchData();
+    const checkAlert = async() => {
+      let al = await AsyncStorage.getItem("alert");
+      if(al != null){
+        setAlert(false);
+      } else {
+        setAlert(true);
+      }
+    }
+
+    checkAlert();
+    var timer = setInterval(function(){engine()}, 10000);
 
     return () => {
       clearInterval(timer);
@@ -299,7 +344,9 @@ const HomePage = ({ navigation }) => {
       longitude: region.longitude,
       name: name,
       fuel: yesfuel,
-      demand: demand
+      demand: demand,
+      station: station,
+      fuelType: fuel
     }).then(function(response){
       if(response.status === 200){
         console.log("done");
@@ -314,7 +361,6 @@ const HomePage = ({ navigation }) => {
         [
           {
             text: "No",
-            onPress: () => alert("Make sure you are near to a gas station!"),
             style: "cancel"
           },
           { text: "Yes", onPress: () => setAdd(true) }
@@ -335,6 +381,11 @@ const HomePage = ({ navigation }) => {
 
       const clearCanvas = () => {
         setDirection(false);
+      }
+
+      const handleCloseAlert = async () => {
+        await AsyncStorage.setItem("alert", "Closed");
+        setAlert(false);
       }
   const height = (Dimensions.get('window').height);
   return (
@@ -372,7 +423,9 @@ const HomePage = ({ navigation }) => {
                       uuid: mark.uuid,
                       fuel: mark.fuel,
                       demand: mark.demand,
-                      name: addr
+                      name: addr,
+                      station: mark.station,
+                      fuelType: mark.fuelType
                     });
         
                     setContext(true);
@@ -491,29 +544,54 @@ const HomePage = ({ navigation }) => {
       </NativeBaseProvider>
    </MapView>
    <View style={styles.trafficBtn}>
-     <FAB onPress={() => {setTraffic(!traffic)}} small={true} uppercase={false} style={{backgroundColor: "white"}} icon="car" color="black" />
+     <FAB onPress={() => {setTraffic(!traffic)}} small={true} uppercase={false} style={{backgroundColor: "white"}} icon="car" label='Traffic' color="black" />
    </View>
    <View style={styles.themeBtn}>
-     <FAB onPress={changeTheme} disabled={add} uppercase={false} small={true} style={{backgroundColor: "white"}} icon="theme-light-dark" color="black" />
+     <FAB onPress={changeTheme} disabled={add} uppercase={false} small={true} style={{backgroundColor: "white"}} icon="theme-light-dark" label='Theme' color="black" />
    </View>
-   <View style={styles.addBtn}>
-     <FAB style={{backgroundColor: "white"}} onPress={() => {add ? closeNewInfo() : addNewInfo()}} small={true} uppercase={false} icon={add ? "close" : "plus"} color="black" />
-   </View>
+    {!ctx ? (
+         <View style={styles.addBtn}>
+         <FAB style={{backgroundColor: "white"}} onPress={() => {add ? closeNewInfo() : addNewInfo()}} small={true} uppercase={false} label={add ? "Close Panel" : "Add New"} icon={add ? "close" : "plus"} color="black" />
+       </View>
+    ) : null}
 
-  {ctx ? (
-       <View style={styles.filterBtn}>
+{direction && !ctx ? (
+       <View style={styles.clearBtn}>
        <FAB style={{backgroundColor: "white"}} small={true} uppercase={false} onPress={() => {
-        toggleStroke() }} icon="palette" color="black" />
+        clearCanvas() }} icon="chevron-left" label='Exit Station' color="black" />
      </View>
   ) : null}
+  {alert ? (
+    <View style={{position: 'absolute', bottom: 30, left: 10, right: 10}}>
+    <NativeBaseProvider>
+    <Alert w="100%" status="info" colorScheme="info">
+    <VStack space={2} flexShrink={1} w="100%">
+      <HStack flexShrink={1} space={2} alignItems="center" justifyContent="space-between">
+        <HStack flexShrink={1} space={2} alignItems="center">
+          <Alert.Icon />
+          <Text fontSize="md" fontWeight="medium" color="coolGray.800">
+            Hi, Welcome. Simple usage steps:
+          </Text>
+        </HStack>
+        <IconButton2 onPress={() => {handleCloseAlert()}} variant="unstyled" _focus={{
+        borderWidth: 0
+      }} icon={<CloseIcon size="3" color="coolGray.600" />} />
+      </HStack>
+      <Box pl="6" _text={{
+      color: "coolGray.600"
+    }}>
+        1. Click the Traffic button to toggle traffic overlay.{"\n"}
+        2. Click theme button to toggle light/dark theme.{"\n"}
+        3. Click Add new to add a new station.{"\n"}
+        4. Click the marker on the map to get more details about the station.{"\n"}
 
-{direction ? (
-       <View style={styles.filterBtn}>
-       <FAB style={{backgroundColor: "white"}} small={true} uppercase={false} onPress={() => {
-        clearCanvas() }} icon="chevron-left" color="black" />
-     </View>
+        Nice Journey ;)
+      </Box>
+    </VStack>
+  </Alert>
+    </NativeBaseProvider>
+</View>
   ) : null}
-
   </View>
   {add && !ctx  ? (
     <View style={{height: height * 0.5, backgroundColor: themeFromContext.colors.background}}>
@@ -546,6 +624,50 @@ const HomePage = ({ navigation }) => {
     </Radio.Group>
           </FormControl>
         {yesfuel ? (
+                    <View>
+                                          <FormControl>
+                    <FormControl.Label ><Text style={{color: themeFromContext.colors.foreground }} >Fuel</Text></FormControl.Label> 
+    <Radio.Group name="myRadioGroup4" onChange={(value) => {
+                  setFuel(value);
+                }} accessibilityLabel="What's the fuel demand?">
+                <Radio value="Diesel" my={1}>
+                 <Text style={{color: themeFromContext.colors.foreground, marginLeft: 10}} >Diesel</Text>
+                </Radio>
+                <Radio value="Petrol" my={1}>
+                  <Text style={{color: themeFromContext.colors.foreground, marginLeft: 10}} >Petrol</Text>
+                </Radio>
+                <Radio  value="Both" my={1}>
+                  <Text style={{color: themeFromContext.colors.foreground, marginLeft: 10}} >Both Petrol & Diesel</Text>
+                </Radio>
+                <Radio  value="V-Power" my={1}>
+                  <Text style={{color: themeFromContext.colors.foreground, marginLeft: 10}} >V-Power</Text>
+                </Radio>
+              </Radio.Group>
+                    </FormControl>
+                    <FormControl my={5}>
+                    <FormControl.Label ><Text style={{color: themeFromContext.colors.foreground }} >Station</Text></FormControl.Label> 
+                    <Select selectedValue={station} bg="white" color={themeFromContext.colors.background} minWidth="200" accessibilityLabel="Choose Station" placeholder="Choose Station" _selectedItem={{
+        bg: "teal.600",
+        endIcon: <CheckIcon size="5" />
+      }} mt={1} onValueChange={itemValue => setStation(itemValue)}>
+          <Select.Item label="Astro" value="Astro" />
+          <Select.Item label="Delta" value="Delta" />
+          <Select.Item label="Engen" value="Engen" />
+          <Select.Item label="Gulf" value="Gulf" />
+          <Select.Item label="Hashi" value="Hashi" />
+          <Select.Item label="Hass" value="Hass" />
+          <Select.Item label="Lexo" value="Lexo" />
+          <Select.Item label="Luqman" value="Luqman" />
+          <Select.Item label="National Oil" value="Naitional Oil" />
+          <Select.Item label="Ola" value="Ola" />
+          <Select.Item label="Petrocity" value="Petrocity" />
+          <Select.Item label="Riva" value="Riva" />
+          <Select.Item label="Rubis" value="Rubis" />
+          <Select.Item label="Shell" value="Shell" />
+          <Select.Item label="Tosha" value="Tosha" />
+          <Select.Item label="Total" value="total" />
+        </Select>
+                    </FormControl>
                     <FormControl>
                     <FormControl.Label ><Text style={{color: themeFromContext.colors.foreground }} >What's the fuel demand?</Text></FormControl.Label> 
                 <Radio.Group name="myRadioGroup2" onChange={(value) => {
@@ -562,6 +684,7 @@ const HomePage = ({ navigation }) => {
                 </Radio>
               </Radio.Group>
                     </FormControl>
+                    </View>
         ) : null}
           <Button2 onPress={() => {addData()}} height={height * 0.06} mt="5" bg="orange.700" style={{ height: 45}} size="md" colorScheme="indigo">
             Add Info
@@ -579,35 +702,45 @@ const HomePage = ({ navigation }) => {
         <NativeBaseProvider  >
         <Center w="100%">
         <Box safeArea p="2" py="8" w="90%" maxW="290" justifyContent="center" safeAreaBottom="5">
-        <Heading size="xs" fontWeight="600" color={themeFromContext.colors.foreground} _dark={{
+        <Heading my={1} size="sm" fontWeight="600" color={themeFromContext.colors.foreground} _dark={{
           color: "white"
         }}>
-          Name/POI: {markregion.name}
+          Approx. Name: {markregion.name}
           </Heading>
-          <Heading size="xs" fontWeight="600" color={themeFromContext.colors.foreground} _dark={{
+          <Heading my={1} size="sm" fontWeight="600" color={themeFromContext.colors.foreground} _dark={{
           color: "white"
         }}>
           Has Fuel: {markregion.fuel ? "Yes" : "No"}
           </Heading>
-          <Heading size="xs" fontWeight="600" color={themeFromContext.colors.foreground} _dark={{
+          <Heading my={1} size="sm" fontWeight="600" color={themeFromContext.colors.foreground} _dark={{
+          color: "white"
+        }}>
+          Station: {markregion.station}
+          </Heading>
+          <Heading my={1} size="sm" fontWeight="600" color={themeFromContext.colors.foreground} _dark={{
+          color: "white"
+        }}>
+          Fuel Type: {markregion.fuelType}
+          </Heading>
+          <Heading my={1} size="sm" fontWeight="600" color={themeFromContext.colors.foreground} _dark={{
           color: "white"
         }}>
           Fuel Demand: {markregion.demand}
           </Heading>
   
         {distance !== null ? (
-                  <Heading size="xs" fontWeight="600" color={themeFromContext.colors.foreground} _dark={{
+                  <Heading my={1} size="sm" fontWeight="600" color={themeFromContext.colors.foreground} _dark={{
                     color: "white"
                   }}>
-                    Approximate Distance: {distance + " KM"}
+                    Approx. Distance: {distance + " KM"}
                     </Heading>
         ) : null}
   
   {duration !== null ? (
-                  <Heading size="xs" fontWeight="600" color={themeFromContext.colors.foreground} _dark={{
+                  <Heading my={1} size="sm" fontWeight="600" color={themeFromContext.colors.foreground} _dark={{
                     color: "white"
                   }}>
-                    Approximate Duration: {duration + " minutes"}
+                    Approx. Duration: {duration + " minutes"}
                     </Heading>
         ) : null}
   
@@ -668,6 +801,11 @@ const styles = StyleSheet.create({
     left: 20,
   },
   filterBtn: {
+    position: 'absolute',
+    top: 190,
+    left: 20
+  },
+  clearBtn: {
     position: 'absolute',
     top: 190,
     left: 20
