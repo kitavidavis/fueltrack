@@ -254,7 +254,7 @@ const HomePage = ({ navigation }) => {
 
   const [changeview, setChangeView] = React.useState(false);
 
-  const API = "AIzaSyAYe7yKaQdvd3pOv_0fq_Mr3cy7rYFZT6E";
+  const API = "....";
   Geocoder.init(API);
 
   const [markers, setMarkers] = React.useState([]);
