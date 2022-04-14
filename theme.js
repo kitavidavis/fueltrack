@@ -44,8 +44,8 @@ const palette = {
     fab: "moon",
     maptheme: [
       {
-        "featureType": "administrative.land_parcel",
-        "elementType": "labels",
+        "featureType": "administrative",
+        "elementType": "geometry",
         "stylers": [
           {
             "visibility": "off"
@@ -54,7 +54,6 @@ const palette = {
       },
       {
         "featureType": "poi",
-        "elementType": "labels.text",
         "stylers": [
           {
             "visibility": "off"
@@ -62,7 +61,8 @@ const palette = {
         ]
       },
       {
-        "featureType": "poi.business",
+        "featureType": "road",
+        "elementType": "labels.icon",
         "stylers": [
           {
             "visibility": "off"
@@ -70,24 +70,14 @@ const palette = {
         ]
       },
       {
-        "featureType": "poi.park",
-        "elementType": "labels.text",
-        "stylers": [
-          {
-            "visibility": "off"
-          }
-        ]
-      },
-      {
-        "featureType": "road.local",
-        "elementType": "labels",
+        "featureType": "transit",
         "stylers": [
           {
             "visibility": "off"
           }
         ]
       }
-    ],
+    ]
   };
   
   export const darkTheme = {

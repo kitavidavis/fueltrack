@@ -6,12 +6,15 @@ import  AsyncStorage from '@react-native-community/async-storage';
 import { StyleSheet, View, ImageBackground, LogBox, Text, SafeAreaView, StatusBar, useColorScheme, Image, ScrollView, Dimensions, useWindowDimensions, Alert as Alert2, PermissionsAndroid} from 'react-native';
 import { createDrawerNavigator, DrawerItemList } from '@react-navigation/drawer';
 import { ActivityIndicator, HelperText, Appbar, Badge, TextInput, Button, IconButton, Divider, Searchbar, TouchableRipple, List, BottomNavigation, Banner, Avatar as Avatar1, FAB} from 'react-native-paper';
-import { NativeBaseProvider, Radio, Skeleton, useToast, Stack as Stack2, Icon, MaterialIcons, Avatar, Center, Pressable, Link, VStack, Box, Heading, FormControl, Input, Button as Button2, HStack, Text as Text2, WarningOutlineIcon, Alert, CloseIcon, IconButton as IconButton2} from 'native-base';
+import { NativeBaseProvider, Radio, Skeleton, useToast, Stack as Stack2, Icon, MaterialIcons, Avatar, Center, Pressable, Link, VStack, Box, Heading, FormControl, Input, Button as Button2, Modal, HStack, Text as Text2, WarningOutlineIcon, Alert, CloseIcon, IconButton as IconButton2} from 'native-base';
 import {theme, darkTheme} from './theme';
 import {TabView, SceneMap, TabBar } from "react-native-tab-view";
 import MapView, {Marker} from 'react-native-maps';
 import Geolocation from "@react-native-community/geolocation";
+import Geocoder from 'react-native-geocoding';
+import MapViewDirections from 'react-native-maps-directions';
 import { hydrate } from 'react-dom';
+import axios from 'axios';
 // ignoring all unnecessary warnings
 LogBox.ignoreAllLogs();
 LogBox.ignoreLogs(['NativeBase:']);
@@ -208,6 +211,102 @@ const HomePage = ({ navigation }) => {
     longitudeDelta: 0.1
   });
 
+  const [markregion, setMarkRegion] = React.useState({
+    latitude: null,
+    longitude: null,
+    uuid: null,
+    fuel: false,
+    demand: null,
+    name: null,
+  });
+
+  const [changeview, setChangeView] = React.useState(false);
+
+  const API = "AIzaSyAYe7yKaQdvd3pOv_0fq_Mr3cy7rYFZT6E";
+  Geocoder.init(API);
+
+  const [markers, setMarkers] = React.useState([]);
+  const [lowd, setLowD] = React.useState([]);
+  const [normald, setNormalD] = React.useState([]);
+  const [highd, setHighD] = React.useState([]);
+  const [showModal, setShowModal] = React.useState(false);
+  const [name, setName] = React.useState(null);
+  const [filter, setFilter] = React.useState(null);
+  const [temp, setTemp] = React.useState(null);
+  const [mounted_, setMounted] = React.useState(false);
+  const [ctx, setContext] = React.useState(false);
+  const [direction, setDirection] = React.useState(false);
+  const [min, setMin] = React.useState(false);
+  const [distance, setDistance] = React.useState(null);
+  const [duration, setDuration] = React.useState(null);
+  const [stroke, setStroke] = React.useState("cyan");
+
+  const geolocate = async() => {
+    Geolocation.getCurrentPosition(async position => {
+      setRegion({
+        latitude: parseFloat(position.coords.latitude),
+        longitude: position.coords.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      });
+
+      if(position.coords.latitude != null){
+        await Geocoder.from(parseFloat(position.coords.latitude), parseFloat(position.coords.longitude)).then(
+           json => {
+            var addressComp = json.results[0].formatted_address;
+            if(addressComp != null){
+              setName(addressComp);
+            }
+          }
+        )
+      }
+    }, error => console.log(error),);
+  };
+
+  const engine = React.useCallback(() => {
+    var uri = "https://fluxservice.herokuapp.com/fuel/all";
+    async function fetchData(){
+      try{
+        await axios.post(uri).then(function(response){
+         if(response.status === 200){
+           let data = response.data.data;
+           setMarkers(data);
+         }
+       }).catch(function(error){
+         console.log(error);
+       })
+     } catch(e){
+       console.log(e);
+     }
+    }
+
+    fetchData();
+}, []);
+
+  React.useEffect(() => {
+    setMounted(true);
+    geolocate();
+    var timer = setInterval(function(){engine()}, 1000);
+
+    return () => {
+      clearInterval(timer);
+    }
+  }, []);
+
+  const addData = () => {
+    axios.post("https://fluxservice.herokuapp.com/fuel/newMarker", {
+      latitude: region.latitude,
+      longitude: region.longitude,
+      name: name,
+      fuel: yesfuel,
+      demand: demand
+    }).then(function(response){
+      if(response.status === 200){
+        console.log("done");
+        closeNewInfo();
+      }
+    })
+  }
     const addNewInfo = () => {
       Alert2.alert(
         "New Information",
@@ -227,22 +326,169 @@ const HomePage = ({ navigation }) => {
         setAdd(false);
         setYesFuel(false);
       }
+
+      const toggleStroke = () => {
+        let i = Math.floor(Math.random() * 7);
+        let colors = ["red", "green", "cyan", "pink", "orange", "blue", "yellow"];
+        setStroke(colors[i]);
+      }
+
+      const clearCanvas = () => {
+        setDirection(false);
+      }
   const height = (Dimensions.get('window').height);
   return (
     <SafeAreaView style={{flex: 1,}}>
       <StatusBar barStyle={themeFromContext.status}  backgroundColor={themeFromContext.colors.background} />
 
- <View style={{height: add ? height * 0.5 : height, backgroundColor: themeFromContext.colors.background}}>
+ <View style={{height: add || ctx ? height * 0.5 : height, backgroundColor: themeFromContext.colors.background}}>
    <MapView
-    style={styles.map} customMapStyle={themeFromContext.maptheme} showsTraffic={traffic} initialRegion={region} showsIndoorLevelPicker={true} showsPointsOfInterest={false} showsUserLocation={true} showsIndoors={true} >
-      <Marker coordinate = {{latitude: -1.3056259012239455,longitude: 36.82388797402382}}
-         pinColor = {"purple"} // any color
-         style={{height: 100, width: 100, backgroundColor: themeFromContext.colors.background}}
-         collapsable={false}
-         title={"title"}
-         description={"Hello There"}>
-           
-         </Marker>
+    style={styles.map} customMapStyle={themeFromContext.maptheme} showsTraffic={traffic} initialRegion={changeview ? markregion : region} showsIndoorLevelPicker={true} showsPointsOfInterest={false} showsUserLocation={true} showsIndoors={true} >
+      { direction ? (
+        <MapViewDirections
+        origin={{latitude: region.latitude, longitude: region.longitude}}
+        destination={{latitude: markregion.latitude, longitude: markregion.longitude}}
+        apikey={API}
+        strokeWidth={8}
+        strokeColor={stroke}
+        onReady={(data) => {
+          setDistance(Math.round(data.distance));
+          setDuration(Math.round(data.duration));
+        }}
+        />
+      ) : null}
+      {filter === null ? (
+              markers.map((mark, idx) => {
+                return (
+                  <Marker onPress={async () => {
+                    let addr;
+                    await Geocoder.from(mark.latitude, mark.longitude).then(json => {
+                      addr = json.results[0].formatted_address;
+
+                    })
+                    setMarkRegion({
+                      latitude: mark.latitude,
+                      longitude: mark.longitude,
+                      uuid: mark.uuid,
+                      fuel: mark.fuel,
+                      demand: mark.demand,
+                      name: addr
+                    });
+        
+                    setContext(true);
+                  }} key={idx} coordinate = {{latitude: mark.latitude,longitude: mark.longitude}}
+                  pinColor = {mark.demand === 'Low' ? "green" : mark.demand === 'Normal' ? "yellow" : "red"} // any color
+                  style={{height: 100, width: 100, backgroundColor: themeFromContext.colors.background}}
+                  collapsable={false}>
+                    
+                  </Marker>
+                )
+              })
+      ) : filter === 'Low' ? (
+        lowd.map((mark, idx) => {
+          return (
+            <Marker onPress={() => {
+              setMarkRegion({
+                latitude: mark.latitude,
+                longitude: mark.longitude,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01
+              });
+  
+              setChangeView(true);
+            }} key={idx} coordinate = {{latitude: mark.latitude,longitude: mark.longitude}}
+            pinColor = {mark.demand === 'Low' ? "green" : mark.demand === 'Normal' ? "yellow" : "red"} // any color
+            style={{height: 100, width: 100, backgroundColor: themeFromContext.colors.background}}
+            collapsable={false}>
+              
+            </Marker>
+          )
+        })
+      ) : filter === 'Normal' ? (
+        normald.map((mark, idx) => {
+          return (
+            <Marker onPress={() => {
+              setMarkRegion({
+                latitude: mark.latitude,
+                longitude: mark.longitude,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01
+              });
+  
+              setChangeView(true);
+            }} key={idx} coordinate = {{latitude: mark.latitude,longitude: mark.longitude}}
+            pinColor = {mark.demand === 'Low' ? "green" : mark.demand === 'Normal' ? "yellow" : "red"} // any color
+            style={{height: 100, width: 100, backgroundColor: themeFromContext.colors.background}}
+            collapsable={false}>
+              
+            </Marker>
+          )
+        })
+      ) : (
+        highd.map((mark, idx) => {
+          return (
+            <Marker onPress={() => {
+              setMarkRegion({
+                latitude: mark.latitude,
+                longitude: mark.longitude,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01
+              });
+  
+              setChangeView(true);
+            }} key={idx} coordinate = {{latitude: mark.latitude,longitude: mark.longitude}}
+            pinColor = {mark.demand === 'Low' ? "green" : mark.demand === 'Normal' ? "yellow" : "red"} // any color
+            style={{height: 100, width: 100, backgroundColor: themeFromContext.colors.background}}
+            collapsable={false}>
+              
+            </Marker>
+          )
+        })
+      )}
+
+      <NativeBaseProvider>
+      <Center>
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)}>
+        <Modal.Content maxWidth="400px">
+          <Modal.CloseButton color={themeFromContext.colors.foreground}/>
+          <Modal.Header bg={themeFromContext.colors.background}><Text style={{color: themeFromContext.colors.foreground,}} >Filter</Text></Modal.Header>
+          <Modal.Body bg={themeFromContext.colors.background}>
+          <FormControl>
+                    <FormControl.Label ><Text style={{color: themeFromContext.colors.foreground }} >Filter by fuel demand</Text></FormControl.Label> 
+                <Radio.Group name="myRadioGroup3" onChange={(value) => {
+                  setTemp(value);
+                }} accessibilityLabel="Choose Filter Level">
+                <Radio value="High" my={1}>
+                 <Text style={{color: themeFromContext.colors.foreground, marginLeft: 10}} >High</Text>
+                </Radio>
+                <Radio value="Normal" my={1}>
+                  <Text style={{color: themeFromContext.colors.foreground, marginLeft: 10}} >Normal</Text>
+                </Radio>
+                <Radio  value="Low" my={1}>
+                  <Text style={{color: themeFromContext.colors.foreground, marginLeft: 10}} >Low</Text>
+                </Radio>
+              </Radio.Group>
+                    </FormControl>
+          </Modal.Body>
+          <Modal.Footer bg={themeFromContext.colors.background}>
+            <Button2.Group space={2}>
+              <Button2 variant="ghost" colorScheme="blueGray" onPress={() => {
+              setShowModal(false);
+            }}>
+                <Text style={{color: themeFromContext.colors.foreground}} >Cancel</Text>
+              </Button2>
+              <Button2 onPress={() => {
+                setFilter(temp);
+              setShowModal(false);
+            }}>
+                Filter
+              </Button2>
+            </Button2.Group>
+          </Modal.Footer>
+        </Modal.Content>
+      </Modal>
+    </Center>
+      </NativeBaseProvider>
    </MapView>
    <View style={styles.trafficBtn}>
      <FAB onPress={() => {setTraffic(!traffic)}} small={true} uppercase={false} style={{backgroundColor: "white"}} icon="car" color="black" />
@@ -254,8 +500,22 @@ const HomePage = ({ navigation }) => {
      <FAB style={{backgroundColor: "white"}} onPress={() => {add ? closeNewInfo() : addNewInfo()}} small={true} uppercase={false} icon={add ? "close" : "plus"} color="black" />
    </View>
 
+  {ctx ? (
+       <View style={styles.filterBtn}>
+       <FAB style={{backgroundColor: "white"}} small={true} uppercase={false} onPress={() => {
+        toggleStroke() }} icon="palette" color="black" />
+     </View>
+  ) : null}
+
+{direction ? (
+       <View style={styles.filterBtn}>
+       <FAB style={{backgroundColor: "white"}} small={true} uppercase={false} onPress={() => {
+        clearCanvas() }} icon="chevron-left" color="black" />
+     </View>
+  ) : null}
+
   </View>
-  {add ? (
+  {add && !ctx  ? (
     <View style={{height: height * 0.5, backgroundColor: themeFromContext.colors.background}}>
       <ScrollView>
       <NativeBaseProvider  >
@@ -273,7 +533,8 @@ const HomePage = ({ navigation }) => {
             if(value === "1"){
               setYesFuel(true)
             } else {
-              setYesFuel(false)
+              setYesFuel(false);
+              setDemand("Low");
             }
           }} >
       <Radio  value="1" my={1}>
@@ -287,20 +548,22 @@ const HomePage = ({ navigation }) => {
         {yesfuel ? (
                     <FormControl>
                     <FormControl.Label ><Text style={{color: themeFromContext.colors.foreground }} >What's the fuel demand?</Text></FormControl.Label> 
-                <Radio.Group name="myRadioGroup2" accessibilityLabel="What's the fuel demand?">
-                <Radio value="1" my={1}>
+                <Radio.Group name="myRadioGroup2" onChange={(value) => {
+                  setDemand(value);
+                }} accessibilityLabel="What's the fuel demand?">
+                <Radio value="High" my={1}>
                  <Text style={{color: themeFromContext.colors.foreground, marginLeft: 10}} >High</Text>
                 </Radio>
-                <Radio value="2" my={1}>
+                <Radio value="Normal" my={1}>
                   <Text style={{color: themeFromContext.colors.foreground, marginLeft: 10}} >Normal</Text>
                 </Radio>
-                <Radio  value="3" my={1}>
+                <Radio  value="Low" my={1}>
                   <Text style={{color: themeFromContext.colors.foreground, marginLeft: 10}} >Low</Text>
                 </Radio>
               </Radio.Group>
                     </FormControl>
         ) : null}
-          <Button2 height={height * 0.06} mt="5" bg="orange.700" style={{ height: 45}} size="md" colorScheme="indigo">
+          <Button2 onPress={() => {addData()}} height={height * 0.06} mt="5" bg="orange.700" style={{ height: 45}} size="md" colorScheme="indigo">
             Add Info
           </Button2>
         </VStack>
@@ -309,8 +572,69 @@ const HomePage = ({ navigation }) => {
     </NativeBaseProvider>
     </ScrollView>
     </View>
+  ) : ctx && !add ? (
+    !min ? (
+      <View style={{height: height * 0.5, backgroundColor: themeFromContext.colors.background}}>
+      <ScrollView>
+        <NativeBaseProvider  >
+        <Center w="100%">
+        <Box safeArea p="2" py="8" w="90%" maxW="290" justifyContent="center" safeAreaBottom="5">
+        <Heading size="xs" fontWeight="600" color={themeFromContext.colors.foreground} _dark={{
+          color: "white"
+        }}>
+          Name/POI: {markregion.name}
+          </Heading>
+          <Heading size="xs" fontWeight="600" color={themeFromContext.colors.foreground} _dark={{
+          color: "white"
+        }}>
+          Has Fuel: {markregion.fuel ? "Yes" : "No"}
+          </Heading>
+          <Heading size="xs" fontWeight="600" color={themeFromContext.colors.foreground} _dark={{
+          color: "white"
+        }}>
+          Fuel Demand: {markregion.demand}
+          </Heading>
+  
+        {distance !== null ? (
+                  <Heading size="xs" fontWeight="600" color={themeFromContext.colors.foreground} _dark={{
+                    color: "white"
+                  }}>
+                    Approximate Distance: {distance + " KM"}
+                    </Heading>
+        ) : null}
+  
+  {duration !== null ? (
+                  <Heading size="xs" fontWeight="600" color={themeFromContext.colors.foreground} _dark={{
+                    color: "white"
+                  }}>
+                    Approximate Duration: {duration + " minutes"}
+                    </Heading>
+        ) : null}
+  
+  
+          <VStack space={3} mt="5">
+  
+            <Button2 onPress={() => {setDirection(true)}} height={height * 0.06} mt="5" bg="cyan.700" style={{ height: 45}} size="md" colorScheme="indigo">
+              Show Direction
+            </Button2>
+  
+          </VStack>
+          <VStack space={3} mt="1">
+  
+  <Button2 onPress={() => {setContext(false)}} height={height * 0.06} mt="5" bg="orange.700" style={{ height: 45}} size="md" colorScheme="indigo">
+    Close Panel
+  </Button2>
+  
+  </VStack>
+        </Box>
+      </Center>
+      </NativeBaseProvider>
+      </ScrollView>
+      </View>
+    ) : null
   ) : null}
     </SafeAreaView>
+    
   );
 }
 
@@ -343,5 +667,10 @@ const styles = StyleSheet.create({
     top: 130,
     left: 20,
   },
+  filterBtn: {
+    position: 'absolute',
+    top: 190,
+    left: 20
+  }
 });
 export default App;
