@@ -5,12 +5,11 @@
 2. Under AndroidManifest.xml, add your key.
 
 # Usage instructions:
-'''
-git clone https://github.com/kitavidavis/fueltrack
-cd fueltrack && npm install
-npm run android
 
-'''
+1. git clone https://github.com/kitavidavis/fueltrack
+2. cd fueltrack && npm install
+3. npm run android
+
 
 # screenshots
 ![](./Screenshot_20220414-144300.png) 
