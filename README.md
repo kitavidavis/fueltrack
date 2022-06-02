@@ -6,9 +6,11 @@
 
 # Usage instructions:
 
-1. git clone https://github.com/kitavidavis/fueltrack
-2. cd fueltrack && npm install
-3. npm run android
+```
+git clone https://github.com/kitavidavis/fueltrack
+cd fueltrack && npm install
+npm run android
+```
 
 
 # screenshots
